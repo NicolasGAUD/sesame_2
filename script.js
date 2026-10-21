@@ -56,7 +56,13 @@ form.addEventListener("submit", async (e) => {
 });
 
 // Étape 2 · La carte dans le prompt système
+const mappedMenu = menu.map((item) => [item.id, item.name]);
 
+const SYSTEM_PROMPT = `Tu es le barista du café Sésame. Voici la carte :
+${JSON.stringify(mappedMenu)}
+Ne propose que des produits de cette carte.`;
+
+messages.push({ role: "system", content: SYSTEM_PROMPT });
 
 // Étape 3 · Une réponse en JSON
 
