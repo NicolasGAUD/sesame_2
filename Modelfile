@@ -3,14 +3,9 @@ PARAMETER temperature 0.3
 PARAMETER num_ctx 4096
 
 SYSTEM """
-Tu peux analyser deux choses : la commande d'un client ou son envie.
-Si tu analyses la commande d'un client d'un salon de thés, cafés et pâtisseries, tu dois répercuter la commande sur le ticket.
-Si tu analyses son envie, il faudra proposer des articles en stock et correspondant à sa demande.
 
 
 
 # FORMAT DE RÉPONSE
-Tu écris ta réponse dans la console
-
 
 """

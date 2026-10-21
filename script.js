@@ -24,6 +24,7 @@ async function askModel(messages) {
         body: JSON.stringify({
             model: MODEL_NAME,
             messages: messages,
+            format: ORDER_FORMAT,
             think: false, // pas de brouillon « Thinking… » : la réponse directement
             stream: false, // la réponse en un seul bloc, quand elle est finie
         }),
@@ -48,8 +49,8 @@ form.addEventListener("submit", async (e) => {
 
     try {
         const reply = await askModel(messages);
-        messages.push({ role: "assistant", content: reply });
-        message.textContent = reply;
+        messages.push({ role: "assistant", content: JSON.parse(reply) });
+        message.textContent = JSON.stringify(reply);
     } catch (err) {
         message.textContent = "Erreur : " + err.message;
     }
@@ -59,13 +60,39 @@ form.addEventListener("submit", async (e) => {
 const mappedMenu = menu.map((item) => [item.id, item.name]);
 
 const SYSTEM_PROMPT = `Tu es le barista du café Sésame. Voici la carte :
-${JSON.stringify(mappedMenu)}
-Ne propose que des produits de cette carte.`;
+${mappedMenu}
+Tu transformes la commande du client en JSON :
+- "lines" : les produits de la carte commandés, avec leur id et leur quantité.
+- "unknown" : les produits demandés qui ne sont PAS sur la carte, tels que le client les a écrits.
+
+Ne remplace jamais un produit absent par un produit qui lui ressemble.
+Un produit indisponible ou absent de la carte va dans "unknown".
+
+Exemple : « un latte et un moka » → {"lines":[{"id":6,"quantity":1}],"unknown":["moka"]}`;
 
 messages.push({ role: "system", content: SYSTEM_PROMPT });
 
 // Étape 3 · Une réponse en JSON
-
+const ORDER_FORMAT = {
+    type: "object",
+    properties: {
+        lines: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    id: {
+                        type: "integer",
+                        enum: menu.filter((item) => item.available).map((item) => item.id),
+                    },
+                    quantity: { type: "integer", minimum: 1 },
+                },
+                required: ["id", "quantity"],
+            },
+        },
+    },
+    required: ["lines", "unknown"],
+};
 
 // Étape 4 · Le ticket se remplit
 
