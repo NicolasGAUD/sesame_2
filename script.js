@@ -114,6 +114,7 @@ const ORDER_FORMAT = {
                 properties: {
                     id: {type: "integer"},
                     quantity: {type: "integer"},
+                    customer: {type: "string"},
                 },
                 required: ["id", "quantity"],
             },
