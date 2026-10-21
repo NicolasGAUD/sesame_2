@@ -20,7 +20,7 @@ const message = document.querySelector("#ai-order-message");
 async function askModel(messages) {
     const response = await fetch(OLLAMA_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
             model: MODEL_NAME,
             messages: messages,
@@ -36,7 +36,6 @@ async function askModel(messages) {
     if (!response.ok) {
         throw new Error(data.error);
     }
-
     return data.message.content;
 }
 
@@ -45,16 +44,35 @@ form.addEventListener("submit", async (e) => {
     const text = input.value.trim();
     if (!text) return;
 
-    messages.push({ role: "user", content: text });
+    messages.push({role: "user", content: text});
 
     try {
+        message.textContent = "Qwen prend la commande…";
+        toggleBtnCommandSubmit(true);
         const reply = await askModel(messages);
-        messages.push({ role: "assistant", content: JSON.parse(reply) });
-        message.textContent = JSON.stringify(reply);
+        messages.push({role: "assistant", content: reply});
+        const qwenOrder = JSON.parse(reply);
+        if (qwenOrder !== undefined){
+            addTicketLines(qwenOrder.lines);
+            input.textContent = "";
+            message.textContent = "Qwen a pris la commande…";
+        }
+        else{
+            message.textContent = "Qwen n'a pas trouvé d'articles …";
+        }
+
     } catch (err) {
         message.textContent = "Erreur : " + err.message;
     }
+    finally{
+        toggleBtnCommandSubmit(false);
+    }
 });
+
+function toggleBtnCommandSubmit(isToDisable) {
+    const btnSubmit = form.querySelector('[type="submit"]');
+    isToDisable ? btnSubmit.disabled = true : btnSubmit.disabled = false;
+}
 
 // Étape 2 · La carte dans le prompt système
 const mappedMenu = menu.map((item) => [item.id, item.name]);
@@ -70,7 +88,7 @@ Un produit indisponible ou absent de la carte va dans "unknown".
 
 Exemple : « un latte et un moka » → {"lines":[{"id":6,"quantity":1}],"unknown":["moka"]}`;
 
-messages.push({ role: "system", content: SYSTEM_PROMPT });
+messages.push({role: "system", content: SYSTEM_PROMPT});
 
 // Étape 3 · Une réponse en JSON
 const ORDER_FORMAT = {
@@ -85,17 +103,31 @@ const ORDER_FORMAT = {
                         type: "integer",
                         enum: menu.filter((item) => item.available).map((item) => item.id),
                     },
-                    quantity: { type: "integer", minimum: 1 },
+                    quantity: {type: "integer", minimum: 1},
                 },
                 required: ["id", "quantity"],
             },
+        },
+        unknown: {
+            type: "array",
+            items: {type: "string"},
         },
     },
     required: ["lines", "unknown"],
 };
 
 // Étape 4 · Le ticket se remplit
+function addTicketLines(lines) {
+    for (const line of lines) {
+        const item = menu.find((tmpItem) => tmpItem.id === line.id);
+        if (!item) continue;
 
+        for (let i = 0; i < line.quantity; i++) {
+            order.add(item);
+        }
+    }
+    renderTicket();
+}
 
 // Étape 5 · La caisse décide
 
