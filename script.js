@@ -44,34 +44,33 @@ form.addEventListener("submit", async (e) => {
     const text = input.value.trim();
     if (!text) return;
 
-    messages.push({role: "user", content: text});
+    messages.push({ role: "user", content: text });
 
     try {
         message.textContent = "Qwen prend la commande…";
-        toggleBtnCommandSubmit(true);
-        const reply = await askModel(messages);
-        messages.push({role: "assistant", content: reply});
-        const qwenOrder = JSON.parse(reply);
-        if (qwenOrder !== undefined){
-            addTicketLines(qwenOrder.lines);
-            input.textContent = "";
-            message.textContent = "Qwen a pris la commande…";
-        }
-        else{
-            message.textContent = "Qwen n'a pas trouvé d'articles …";
-        }
+        setSubmitDisabled(true);
 
+        const reply = await askModel(messages);
+        messages.push({ role: "assistant", content: reply });
+        const qwenOrder = JSON.parse(reply);
+
+        if (qwenOrder.lines.length > 0) {
+            addTicketLines(qwenOrder.lines);
+            message.textContent = "Qwen a pris la commande.";
+        } else {
+            message.textContent = "Qwen n'a trouvé aucun article de la carte.";
+        }
     } catch (err) {
         message.textContent = "Erreur : " + err.message;
-    }
-    finally{
-        toggleBtnCommandSubmit(false);
+    } finally {
+        input.value = "";
+        setSubmitDisabled(false);
     }
 });
 
-function toggleBtnCommandSubmit(isToDisable) {
+function setSubmitDisabled(isDisabled) {
     const btnSubmit = form.querySelector('[type="submit"]');
-    isToDisable ? btnSubmit.disabled = true : btnSubmit.disabled = false;
+    btnSubmit.disabled = isDisabled;
 }
 
 // Étape 2 · La carte dans le prompt système
