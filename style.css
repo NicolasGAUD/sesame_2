@@ -145,6 +145,10 @@ input:focus-visible {
   cursor: wait;
 }
 
+#ai-order-message {
+  white-space: pre-line;
+}
+
 .ai-message {
   min-height: 1.4em;
   margin: 8px 0 0;

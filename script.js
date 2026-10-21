@@ -17,6 +17,12 @@ const form = document.querySelector("#ai-order-form");
 const input = document.querySelector("#ai-order-input");
 const message = document.querySelector("#ai-order-message");
 
+const orderMessages = [];
+
+function setMessageContent(textContent) {
+    orderMessages.push(textContent);
+}
+
 async function askModel(messages) {
     const response = await fetch(OLLAMA_URL, {
         method: "POST",
@@ -46,7 +52,12 @@ form.addEventListener("submit", async (e) => {
 
     messages.push({ role: "user", content: text });
 
+    // Nouveau client : on repart d'une liste de messages vide
+    orderMessages.length = 0;
+
     try {
+        // ANCIEN : setMessageContent("Qwen prend la commande…");
+        // Ce message doit se voir PENDANT l'attente : on l'écrit directement
         message.textContent = "Qwen prend la commande…";
         setSubmitDisabled(true);
 
@@ -54,17 +65,25 @@ form.addEventListener("submit", async (e) => {
         messages.push({ role: "assistant", content: reply });
         const qwenOrder = JSON.parse(reply);
 
+        // ANCIEN :
+        // if (qwenOrder.lines.length > 0) {
+        //     addTicketLines(qwenOrder.lines);
+        // }
         if (qwenOrder.lines.length > 0) {
-            addTicketLines(qwenOrder.lines);
-            message.textContent = "Qwen a pris la commande.";
+            const addedCount = addTicketLines(qwenOrder.lines);
+            if (addedCount > 0) {
+                setMessageContent("Qwen a pris la commande.");
+            }
         } else {
-            message.textContent = "Qwen n'a trouvé aucun article de la carte.";
+            setMessageContent("Qwen n'a trouvé aucun article de la carte.");
         }
     } catch (err) {
-        message.textContent = "Erreur : " + err.message;
+        setMessageContent("Erreur : " + err.message);
     } finally {
         input.value = "";
         setSubmitDisabled(false);
+        // Un seul endroit pour afficher, quel que soit le chemin suivi
+        displayOrderMessages(orderMessages);
     }
 });
 
@@ -74,20 +93,15 @@ function setSubmitDisabled(isDisabled) {
 }
 
 // Étape 2 · La carte dans le prompt système
-const mappedMenu = menu.map((item) => [item.id, item.name]);
+const promptMenu = menu.map((item) => ({id: item.id, name: item.name}));
 
-const SYSTEM_PROMPT = `Tu es le barista du café Sésame. Voici la carte :
-${mappedMenu}
-Tu transformes la commande du client en JSON :
-- "lines" : les produits de la carte commandés, avec leur id et leur quantité.
-- "unknown" : les produits demandés qui ne sont PAS sur la carte, tels que le client les a écrits.
+const orderPrompt = `Tu prends les commandes au comptoir du café Sésame.
+Voici la carte : ${JSON.stringify(promptMenu)}
 
-Ne remplace jamais un produit absent par un produit qui lui ressemble.
-Un produit indisponible ou absent de la carte va dans "unknown".
+Pour chaque produit commandé, renvoie son id et sa quantité dans "lines".
+Ne remplace jamais un produit absent de la carte par un produit qui lui ressemble : ignore-le simplement.`;
 
-Exemple : « un latte et un moka » → {"lines":[{"id":6,"quantity":1}],"unknown":["moka"]}`;
-
-messages.push({role: "system", content: SYSTEM_PROMPT});
+messages.push({role: "system", content: orderPrompt});
 
 // Étape 3 · Une réponse en JSON
 const ORDER_FORMAT = {
@@ -98,38 +112,53 @@ const ORDER_FORMAT = {
             items: {
                 type: "object",
                 properties: {
-                    id: {
-                        type: "integer",
-                        enum: menu.filter((item) => item.available).map((item) => item.id),
-                    },
-                    quantity: {type: "integer", minimum: 1},
+                    id: {type: "integer"},
+                    quantity: {type: "integer"},
                 },
                 required: ["id", "quantity"],
             },
         },
-        unknown: {
-            type: "array",
-            items: {type: "string"},
-        },
     },
-    required: ["lines", "unknown"],
+    required: ["lines"],
 };
 
 // Étape 4 · Le ticket se remplit
 function addTicketLines(lines) {
+    let addedCount = 0;
+
     for (const line of lines) {
         const item = menu.find((tmpItem) => tmpItem.id === line.id);
-        if (!item) continue;
-
-        for (let i = 0; i < line.quantity; i++) {
-            order.add(item);
+        if (!item) {
+            // ANCIEN : setMessageContent("Cet article n'existe pas, désolé !");
+            setMessageContent(`L'article n°${line.id} n'existe pas.`);
+        } else if (!item.available) {
+            // ANCIEN : setMessageContent(`Désolé, rupture de stock sur cet article ! ${item.name}`);
+            setMessageContent(`${item.name} est épuisé.`);
+        } else if (line.quantity <= 0 || line.quantity > 10 || !Number.isInteger(line.quantity)) {
+            // ANCIEN : setMessageContent("Désolé, quantité invalide");
+            setMessageContent(`${item.name} : quantité invalide (${line.quantity}), entre 1 et 10.`);
+        } else {
+            for (let i = 0; i < line.quantity; i++) {
+                order.add(item);
+            }
+            addedCount++;
         }
     }
+
+    // ANCIEN : displayOrderMessages(orderMessages);
+    // → déplacé dans le finally du handler
     renderTicket();
+    return addedCount;
 }
 
 // Étape 5 · La caisse décide
-
+function displayOrderMessages(orderMessages) {
+    // ANCIEN :
+    // for (const orderMessage of orderMessages) {
+    //     this.message.textContent += "\n" + orderMessage.textContent;
+    // }
+    message.textContent = orderMessages.join("\n");
+}
 
 // Étape 6 · Quand l'IA ne répond pas
 
