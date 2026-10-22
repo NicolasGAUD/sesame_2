@@ -51,7 +51,7 @@ form.addEventListener("submit", async (e) => {
     // Nouveau client : on repart d'une liste de messages vide
     orderMessages.length = 0;
     const messages = [{role: "system", content: orderPrompt},
-        { role: "user", content: text }];
+        {role: "user", content: text}];
 
     try {
         // ANCIEN : setMessageContent("Qwen prend la commande…");
@@ -91,8 +91,16 @@ const promptMenu = menu.map((item) => ({id: item.id, name: item.name}));
 const orderPrompt = `Tu prends les commandes au comptoir du café Sésame.
 Voici la carte : ${JSON.stringify(promptMenu)}
 
-Pour chaque produit commandé, renvoie son id et sa quantité dans "lines".
-Ne remplace jamais un produit absent de la carte par un produit qui lui ressemble : ignore-le simplement.`;
+Pour chaque produit commandé, renvoie son nom exact tel qu'il est écrit sur la carte, son id et sa quantité dans "lines".
+Les clients ne disent pas toujours le nom exact : retrouve le produit de la carte qui correspond à ce qu'ils veulent dire.
+Ne remplace jamais un produit absent de la carte par un produit qui lui ressemble : ignore-le simplement.
+
+Exemples :
+« un cookie aux pépites et un latte » → {"lines":[{"name":"Cookie pépites","id":12,"quantity":1},{"name":"Latte","id":6,"quantity":1}]}
+« trois cappu » → {"lines":[{"name":"Cappuccino","id":4,"quantity":3}]}
+« un petit matcha et deux cookies au sésame » → {"lines":[{"name":"Matcha latte","id":10,"quantity":1},{"name":"Cookie sésame","id":13,"quantity":2}]}
+« un filtre V60 » → {"lines":[{"name":"Filtre V60","id":7,"quantity":1}]}
+« un moka » → {"lines":[]}`;
 
 // Étape 3 · Une réponse en JSON
 const ORDER_FORMAT = {
@@ -103,11 +111,12 @@ const ORDER_FORMAT = {
             items: {
                 type: "object",
                 properties: {
+                    name: {type: "string"},
                     id: {type: "integer"},
                     quantity: {type: "integer"},
                     customer: {type: "string"},
                 },
-                required: ["id", "quantity"],
+                required: ["name", "id", "quantity"],
             },
         },
     },
@@ -115,35 +124,45 @@ const ORDER_FORMAT = {
 };
 
 // Étape 4 · Le ticket se remplit
+// Ignore les majuscules et les espaces en trop
+function normalize(text) {
+    return String(text).trim().toLowerCase();
+}
+
 function addTicketLines(lines) {
     let addedCount = 0;
+    console.log(lines)
     for (const line of lines) {
         const item = menu.find((tmpItem) => tmpItem.id === line.id);
         if (!item) {
             setMessageContent(`L'article n°${line.id} n'existe pas.`);
-        } else if (!item.available) {
-            setMessageContent(`${item.name} est épuisé.`);
-        } else if (line.quantity <= 0 || line.quantity > 10 || !Number.isInteger(line.quantity)) {
-            setMessageContent(`${item.name} : quantité invalide (${line.quantity}), entre 1 et 10.`);
-        } else {
-            for (let i = 0; i < line.quantity; i++) {
-                order.add(item);
-            }
-            addedCount++;
+        } else if (normalize(line.name) !== normalize(item.name)) {
+            setMessageContent(`Qwen a hésité entre « ${line.name} » et « ${item.name} » : vérifie la commande.`);
         }
+        else
+            if (!item.available) {
+                setMessageContent(`${item.name} est épuisé.`);
+            } else if (line.quantity <= 0 || line.quantity > 10 || !Number.isInteger(line.quantity)) {
+                setMessageContent(`${item.name} : quantité invalide (${line.quantity}), entre 1 et 10.`);
+            } else {
+                for (let i = 0; i < line.quantity; i++) {
+                    order.add(item);
+                }
+                addedCount++;
+            }
+        }
+        renderTicket();
+        return addedCount;
     }
-    renderTicket();
-    return addedCount;
-}
 
 // Étape 5 · La caisse décide
-function displayOrderMessages(orderMessages) {
-    // ANCIEN :
-    // for (const orderMessage of orderMessages) {
-    //     this.message.textContent += "\n" + orderMessage.textContent;
-    // }
-    message.textContent = orderMessages.join("\n");
-}
+    function displayOrderMessages(orderMessages) {
+        // ANCIEN :
+        // for (const orderMessage of orderMessages) {
+        //     this.message.textContent += "\n" + orderMessage.textContent;
+        // }
+        message.textContent = orderMessages.join("\n");
+    }
 
 // Étape 6 · Quand l'IA ne répond pas
 
@@ -158,5 +177,5 @@ function displayOrderMessages(orderMessages) {
 
 
 // Premier affichage
-renderMenu("all");
-renderTicket();
+    renderMenu("all");
+    renderTicket();
