@@ -11,8 +11,6 @@ const MODEL_NAME = "sesame";
 // L'adresse d'Ollama sur ta machine : 11434 est le port où il écoute
 const OLLAMA_URL = "http://localhost:11434/api/chat";
 
-const messages = [];
-
 const form = document.querySelector("#ai-order-form");
 const input = document.querySelector("#ai-order-input");
 const message = document.querySelector("#ai-order-message");
@@ -50,10 +48,10 @@ form.addEventListener("submit", async (e) => {
     const text = input.value.trim();
     if (!text) return;
 
-    messages.push({ role: "user", content: text });
-
     // Nouveau client : on repart d'une liste de messages vide
     orderMessages.length = 0;
+    const messages = [{role: "system", content: orderPrompt},
+        { role: "user", content: text }];
 
     try {
         // ANCIEN : setMessageContent("Qwen prend la commande…");
@@ -62,13 +60,8 @@ form.addEventListener("submit", async (e) => {
         setSubmitDisabled(true);
 
         const reply = await askModel(messages);
-        messages.push({ role: "assistant", content: reply });
         const qwenOrder = JSON.parse(reply);
 
-        // ANCIEN :
-        // if (qwenOrder.lines.length > 0) {
-        //     addTicketLines(qwenOrder.lines);
-        // }
         if (qwenOrder.lines.length > 0) {
             const addedCount = addTicketLines(qwenOrder.lines);
             if (addedCount > 0) {
@@ -101,8 +94,6 @@ Voici la carte : ${JSON.stringify(promptMenu)}
 Pour chaque produit commandé, renvoie son id et sa quantité dans "lines".
 Ne remplace jamais un produit absent de la carte par un produit qui lui ressemble : ignore-le simplement.`;
 
-messages.push({role: "system", content: orderPrompt});
-
 // Étape 3 · Une réponse en JSON
 const ORDER_FORMAT = {
     type: "object",
@@ -126,17 +117,13 @@ const ORDER_FORMAT = {
 // Étape 4 · Le ticket se remplit
 function addTicketLines(lines) {
     let addedCount = 0;
-
     for (const line of lines) {
         const item = menu.find((tmpItem) => tmpItem.id === line.id);
         if (!item) {
-            // ANCIEN : setMessageContent("Cet article n'existe pas, désolé !");
             setMessageContent(`L'article n°${line.id} n'existe pas.`);
         } else if (!item.available) {
-            // ANCIEN : setMessageContent(`Désolé, rupture de stock sur cet article ! ${item.name}`);
             setMessageContent(`${item.name} est épuisé.`);
         } else if (line.quantity <= 0 || line.quantity > 10 || !Number.isInteger(line.quantity)) {
-            // ANCIEN : setMessageContent("Désolé, quantité invalide");
             setMessageContent(`${item.name} : quantité invalide (${line.quantity}), entre 1 et 10.`);
         } else {
             for (let i = 0; i < line.quantity; i++) {
@@ -145,9 +132,6 @@ function addTicketLines(lines) {
             addedCount++;
         }
     }
-
-    // ANCIEN : displayOrderMessages(orderMessages);
-    // → déplacé dans le finally du handler
     renderTicket();
     return addedCount;
 }
