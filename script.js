@@ -38,6 +38,8 @@ async function askModel(messages) {
 
     // response.ok vaut false si Ollama a répondu par une erreur (modèle introuvable...)
     if (!response.ok) {
+        message.classList.add("is-error");
+        message.textContent = data.error;
         throw new Error(data.error);
     }
     return data.message.content;
