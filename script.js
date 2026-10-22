@@ -38,8 +38,6 @@ async function askModel(messages) {
 
     // response.ok vaut false si Ollama a répondu par une erreur (modèle introuvable...)
     if (!response.ok) {
-        message.classList.add("is-error");
-        message.textContent = data.error;
         throw new Error(data.error);
     }
     return data.message.content;
@@ -58,6 +56,7 @@ form.addEventListener("submit", async (e) => {
     try {
         // ANCIEN : setMessageContent("Qwen prend la commande…");
         // Ce message doit se voir PENDANT l'attente : on l'écrit directement
+        message.classList.remove("is-error");
         message.textContent = "Qwen prend la commande…";
         setSubmitDisabled(true);
 
@@ -65,6 +64,7 @@ form.addEventListener("submit", async (e) => {
         const qwenOrder = JSON.parse(reply);
 
         if (qwenOrder.lines.length > 0) {
+            input.value = "";
             const addedCount = addTicketLines(qwenOrder.lines);
             if (addedCount > 0) {
                 setMessageContent("Qwen a pris la commande.");
@@ -72,10 +72,18 @@ form.addEventListener("submit", async (e) => {
         } else {
             setMessageContent("Qwen n'a trouvé aucun article de la carte.");
         }
-    } catch (err) {
-        setMessageContent("Erreur : " + err.message);
+    } catch (error) {
+        // Étape 6 · Quand l'IA ne répond pas
+        message.classList.add("is-error");
+        if ( error instanceof TypeError) {
+            setMessageContent("L'IA ne répond pas : prends la commande à la main.");
+        }
+        else
+        {
+            setMessageContent("Erreur interne : prends la commande à la main.");
+        }
+        console.error("error name: " + error.name + " error msg : " + error.message);
     } finally {
-        input.value = "";
         setSubmitDisabled(false);
         // Un seul endroit pour afficher, quel que soit le chemin suivi
         displayOrderMessages(orderMessages);
@@ -133,7 +141,6 @@ function normalize(text) {
 
 function addTicketLines(lines) {
     let addedCount = 0;
-    console.log(lines)
     for (const line of lines) {
         const item = menu.find((tmpItem) => tmpItem.id === line.id);
         if (!item) {
