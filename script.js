@@ -65,6 +65,10 @@ form.addEventListener("submit", async (e) => {
 
         if (qwenOrder.lines.length > 0) {
             input.value = "";
+            const customer = qwenOrder.customer.trim();
+            if (customer !== "") {
+                order.customer = customer;
+            }
             const addedCount = addTicketLines(qwenOrder.lines);
             if (addedCount > 0) {
                 setMessageContent("Qwen a pris la commande.");
@@ -105,12 +109,15 @@ Pour chaque produit commandé, renvoie son nom exact tel qu'il est écrit sur la
 Les clients ne disent pas toujours le nom exact : retrouve le produit de la carte qui correspond à ce qu'ils veulent dire.
 Ne remplace jamais un produit absent de la carte par un produit qui lui ressemble : ignore-le simplement.
 
+Si la phrase contient le prénom du client, renvoie-le dans "customer". Sinon, renvoie une chaîne vide "".
+Un nom de produit de la carte n'est jamais un prénom.
+
 Exemples :
-« un cookie aux pépites et un latte » → {"lines":[{"name":"Cookie pépites","id":12,"quantity":1},{"name":"Latte","id":6,"quantity":1}]}
-« trois cappu » → {"lines":[{"name":"Cappuccino","id":4,"quantity":3}]}
-« un petit matcha et deux cookies au sésame » → {"lines":[{"name":"Matcha latte","id":10,"quantity":1},{"name":"Cookie sésame","id":13,"quantity":2}]}
-« un filtre V60 » → {"lines":[{"name":"Filtre V60","id":7,"quantity":1}]}
-« un moka » → {"lines":[]}`;
+« un cookie aux pépites et un latte pour Hugo » → {"lines":[{"name":"Cookie pépites","id":12,"quantity":1},{"name":"Latte","id":6,"quantity":1}],"customer":"Hugo"}
+« c'est pour Inès : trois cappu » → {"lines":[{"name":"Cappuccino","id":4,"quantity":3}],"customer":"Inès"}
+« un petit matcha et deux cookies au sésame » → {"lines":[{"name":"Matcha latte","id":10,"quantity":1},{"name":"Cookie sésame","id":13,"quantity":2}],"customer":""}
+« un filtre V60 » → {"lines":[{"name":"Filtre V60","id":7,"quantity":1}],"customer":""}
+« un moka » → {"lines":[],"customer":""}`;
 
 // Étape 3 · Une réponse en JSON
 const ORDER_FORMAT = {
@@ -124,13 +131,13 @@ const ORDER_FORMAT = {
                     name: {type: "string"},
                     id: {type: "integer"},
                     quantity: {type: "integer"},
-                    customer: {type: "string"},
                 },
                 required: ["name", "id", "quantity"],
             },
         },
+        customer: {type: "string"},
     },
-    required: ["lines"],
+    required: ["lines", "customer"],
 };
 
 // Étape 4 · Le ticket se remplit
